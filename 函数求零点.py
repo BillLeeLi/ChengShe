@@ -64,11 +64,12 @@ def find_all_roots(expr: str, x_range=(-10, 10), error=1e-7):
     return sorted(roots)
 
 
-def calc():
+def calc_zero_point():
     roots = find_all_roots(txt.get())
     # print(roots)
     if len(roots) == 0:
         res.config(text="无零点")
+        res.pack()
         return
     s = "零点为："
     for root in roots:
@@ -77,14 +78,45 @@ def calc():
     res.pack()
 
 
+def calc_extreme_point():
+    expr = insert_multiplication(txt.get())
+    expr = sympy.sympify(expr)
+    derived_func1 = sympy.diff(expr, x)
+    stag_points = find_all_roots(str(derived_func1))
+    extr_points = []
+    for sp in stag_points:
+        # 检验驻点是不是极值点，需要依次求导
+        i = 2  # 记录导数的阶数
+        dfunc = derived_func1
+        while True:  # 一直求导下去，直到导函数在驻点的值不为零
+            dfunc = sympy.diff(dfunc, x)
+            if abs(dfunc.subs(x, sp).evalf()) > 1e-5:
+                # 这一阶导数不是0,偶数阶是极值点，计数阶不是极值点
+                if i % 2 == 0:
+                    extr_points.append(sp)
+                break
+            i += 1
+    if len(extr_points) == 0:
+        res.config(text="无极值点")
+    else:
+        s = "极值点为："
+        for sp in extr_points:
+            s += f" {sp:.5f}"
+            res.config(text=s)
+    res.pack()
+
+
 root = Tk()
 root.geometry("400x400")
 root.title("函数求零点")
 
-Label(root, text="请输入需要求零点的函数", font=("bold", 15)).pack(pady=5)
+Label(root, text="请输入函数表达式", font=("bold", 15)).pack(pady=5)
 txt = StringVar()
 Entry(root, font=("bold", 15), textvariable=txt).pack(pady=5)
-Button(root, command=calc, font=("bold", 15), text="计算").pack(pady=5)
+Button(root, command=calc_zero_point, font=("bold", 15), text="计算零点").pack(pady=5)
+Button(root, command=calc_extreme_point, font=("bold", 15), text="计算极值点").pack(
+    pady=5
+)
 res = Label(root, font=("bold", 15))
 
 
