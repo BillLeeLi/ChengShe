@@ -1,10 +1,12 @@
 import tkinter as tk
 from test import calc
+from tkinter import ttk
+
 root = tk.Tk()
 root.title("科学计算器")
 root.configure(bg='#f0f0f0')  # 设置背景色
-
-
+graph_window = None
+exist=False
 # 配置网格行列权重
 for col in range(5):
     root.columnconfigure(col, weight=1)
@@ -91,26 +93,127 @@ def all_clear():
     input_entry.delete(0,tk.END)
 
 
+
+class child_window:
+    
+    def __init__(self, parent):
+        
+        global exist
+        if exist:
+            return
+        exist=True
+        self.window = tk.Toplevel(parent)
+        self.window.title("画布")
+        self.window.geometry("900x500")  # 增大窗口尺寸
+        self.current_act=1
+        self.entries=[]
+        
+        # 主布局容器（左右分割比例调整为1:2）
+        self.main_paned = tk.PanedWindow(self.window, orient=tk.HORIZONTAL, sashwidth=5)
+        self.main_paned.pack(fill=tk.BOTH, expand=True)
+        
+        # ========== 左侧输入框区域（宽度300） ==========
+        self.left_frame = tk.Frame(self.main_paned, bg="#f0f0f0")
+        self.main_paned.add(self.left_frame, width=300)  # 固定左侧宽度
+        
+        # 初始化5个固定输入框
+        self._create_inputs()
+        
+        # ========== 右侧扩展区域（宽度自适应剩余空间） ==========
+        self.right_frame = tk.Frame(self.main_paned, bg="white")
+        self.main_paned.add(self.right_frame, minsize=400)  
+        
+       
+        self.window.protocol("WM_DELETE_WINDOW", self._on_close)#将叉号绑定_on_close函数
+        self.update()
+    def _on_close(self):
+        global exist
+        exist=False
+        self.window.destroy()
+    def update(self):
+        entry=self.entries[5]
+        entry.delete(0,tk.END)
+        entry.insert(0,f"方程{self.current_act}")
+        
+    def _create_inputs(self):
+        
+        
+        
+        # 输入框容器
+        input_container = tk.Frame(self.left_frame, bg="#f0f0f0")
+        input_container.pack(fill=tk.BOTH, expand=True, padx=5)
+        
+        # 使用grid布局精准控制按钮位置
+        for i in range(1, 6):
+            row_frame = tk.Frame(input_container, bg="#f0f0f0")
+            row_frame.grid(row=i, column=0, sticky="ew", pady=3)
+            
+            # 输入框标签
+            lbl = tk.Label(
+                row_frame,
+                text=f"方程 {i}:",
+                width=8,
+                anchor='w',
+                bg="#f0f0f0"
+            )
+            lbl.grid(row=0, column=0, padx=2)
+            
+            # 输入框
+            entry = ttk.Entry(row_frame, width=18)
+            entry.grid(row=0, column=1, padx=2, sticky="ew")
+            
+            # 清空按钮
+            btn = ttk.Button(
+                row_frame,
+                text="×",
+                width=3,
+                command=lambda idx=i: self.clear_single(idx)
+            )
+            btn.grid(row=0, column=2, padx=2)
+            
+            # 行框架列配置（输入框自动扩展）
+            row_frame.columnconfigure(1, weight=1)
+            ttk.Button(
+            row_frame,
+            text="✎",  
+            width=3,
+            command=lambda idx=i: self.edit_single(idx)
+            ).grid(row=0, column=3, padx=(2,5))  # 左间距2，右间距5
+            self.entries.append(entry)
+        row_frame = tk.Frame(input_container, bg="#f0f0f0")
+        row_frame.grid(row=7, column=0, sticky="ew", pady=3)
+        lbl = tk.Label(
+                row_frame,
+                text=f"当前操作:",
+                width=8,
+                anchor='w',
+                bg="#f0f0f0"
+            )
+        lbl.grid(row=0, column=0, padx=2)
+            
+            # 输入框
+        entry = ttk.Entry(row_frame, width=18)
+        entry.grid(row=0, column=1, padx=2, sticky="ew")
+        self.entries.append(entry)
+        # 调整列权重（让输入框列自动扩展）
+        row_frame.columnconfigure(1, weight=1)
+        
+        # 容器列配置
+        input_container.columnconfigure(0, weight=1)
+        
+    
+    
+    def edit_single(self,input_id):
+        index=input_id-1
+        self.current_act=input_id
+        self.update()
+    def clear_single(self, input_id):
+        """清空指定输入框"""
+        index=input_id-1
+        entry = self.entries[index]  # 第2个子组件是输入框
+        entry.delete(0, tk.END)
 def open_graph():
-    # 创建子窗口
-    settings_window = tk.Toplevel(root)
-    settings_window.title("画布")
-    settings_window.geometry("900x700")
-    settings_window.configure(bg='#f0f0f0')  # 与主窗口风格一致
-    
-    
-    
-    # 添加子窗口内容
-    label = tk.Label(
-        settings_window,
-        #text="画布",
-        font=('Arial', 18),
-        bg='#f0f0f0',
-        fg='black'
-    )
-    label.pack(pady=20)
-    
-    
+    child_window(root)
     
     
 
