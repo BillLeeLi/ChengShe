@@ -1,13 +1,13 @@
 import tkinter as tk
 from tkinter import messagebox
 import sympy
-from sympy.abc import x, y
 import scipy
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 import re
+import warnings
 
 
 def insert_multiplication(expr: str):
@@ -51,29 +51,6 @@ def process_expr(expr: str):
     return expr
 
 
-def draw_plots(master, expr: str, plot_canvas: FigureCanvasTkAgg, ax):
-    """
-    该方法以master为父窗口,插入画板绘出expr对应的图像
-    plot_canvas是一个FigureCanvasTkAgg对象, ax是轴对象
-    plot_canvas最好作为窗口的一个组件存在,而不是在函数的内部存在
-    """
-    original_expr = expr
-    expr = insert_multiplication(expr)
-    expr = process_expr(expr)
-    xs = np.linspace(-5, 5, 100)  # x轴上打出点列
-    try:
-        ys = eval(expr, {"x": xs, "np": np, "__builtins__": {}})
-        ax.plot(xs, ys)
-        ax.set_label(f"y={original_expr}")
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        ax.grid(True)
-        plot_canvas.draw()
-    except Exception as e:
-        print(e)  # 测试语句
-        messagebox.showerror(title="错误", message=f"无法解析表达式: {e}")
-
-
 def calc(expr: str):
     """
     该方法计算表达式expr的值,表达式中不应该含有变量如x y
@@ -83,11 +60,85 @@ def calc(expr: str):
     expr = insert_multiplication(expr)
     expr = process_expr(expr)
     try:
-        res = eval(expr, {"np": np, "π": np.pi, "__builtins__": {}})
-        return str(res)
+        with warnings.catch_warnings():  # 忽略计算中的异常，只捕获算式不合法导致的错误
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            res = eval(expr, {"np": np, "π": np.pi, "__builtins__": {}})
+            return str(res)
     except Exception as e:
         print(e)  # 用于测试，后期会注释掉
         messagebox.showerror(title="错误", message="请检查算术表达式")
-
-        # 后期可以增加异常类型的判断，来更好地提示用户。比如用户可能在算式中包含了未知量，或者计算除以0这种常见错误
         return None
+
+
+class FigureCanvas:
+    def __init__(self, fig, ax, parent):
+        # fig是绑定的图像，ax是轴，parent是父窗口
+        # 成员都设置为私有的
+        self.__ax = ax
+        self.__plot_canvas = FigureCanvasTkAgg(fig, master=parent)
+        self.__toolbar = NavigationToolbar2Tk(self.__plot_canvas, parent)
+        self.__toolbar.update()
+        self.__plot_canvas.get_tk_widget().pack(expand=True, fill="both")
+
+        self.__ax.set_xlabel("x")
+        self.__ax.set_ylabel("y")
+        self.__ax.set_xlim(-10, 10)
+        self.__ax.set_ylim(-10, 10)
+        self.__ax.set_aspect("equal")
+        self.__ax.grid(True)
+        self.__ax.callbacks.connect("xlim_changed", self.__on_xlim_changed)
+        self.__lines = {}
+
+    # 为了方便把处理字符串的两个函数合成一个类方法了
+    def __process(self, expr: str):
+        expr = insert_multiplication(expr)
+        expr = process_expr(expr)
+        return expr
+
+    # 绘制expr对应的函数图像
+    def draw_plots(self, expr: str):
+        expr = self.__process(expr)
+        if expr in self.__lines:  # 这条图像已经在画布中了
+            return
+
+        if not "=" in expr:  # 绘制普通函数图像
+            x_min, x_max = self.__ax.get_xlim()
+            xs = np.linspace(x_min, x_max, 1000)
+            try:
+                with warnings.catch_warnings():  # 忽略计算中的警告，只捕获算式不合法导致的错误
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    ys = eval(expr, {"np": np, "x": xs, "π": np.pi, "__builtins__": {}})
+                    # 把图像保存下来，方便之后操作
+                    self.__lines[expr] = self.__ax.plot(xs, ys)[0]
+                    self.__plot_canvas.draw()
+            except Exception as e:
+                print(e)
+                messagebox.showerror(title="错误", message="请检查函数表达式")
+        else:
+            # 绘制隐函数图像
+            pass
+
+    # 删除expr对应的函数图像
+    def delete_plots(self, expr: str):
+        expr = self.__process(expr)
+        if expr in self.__lines:
+            line = self.__lines.pop(expr)
+            line.remove()
+            self.__plot_canvas.draw()
+
+    def __on_xlim_changed(self, event):
+        self.__update_plot()
+
+    def __update_plot(self):
+        x_min, x_max = self.__ax.get_xlim()
+        xs = np.linspace(x_min, x_max, 1000)
+        for expr, line in self.__lines.items():
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    ys = eval(expr, {"np": np, "x": xs, "π": np.pi, "__builtins__": {}})
+                    line.set_data(xs, ys)
+                    self.__plot_canvas.draw_idle()
+            except Exception as e:
+                print(e)
+                messagebox.showerror(title="错误", message="请检查函数表达式")
