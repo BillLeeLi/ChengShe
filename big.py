@@ -1,10 +1,18 @@
 import tkinter as tk
-from test import calc
+from funcs import *
 from tkinter import ttk
+import matplotlib.pyplot as plt
+import sys
+
+def on_close(): # 终止程序
+    root.quit()
+    root.destroy()
+    sys.exit("程序终止")
 
 root = tk.Tk()
 root.title("科学计算器")
 root.configure(bg='#f0f0f0')  # 设置背景色
+root.protocol("WM_DELETE_WINDOW", on_close) # 确保在窗口关闭时会终止程序
 graph_window = None
 exist=False
 # 配置网格行列权重
@@ -122,6 +130,8 @@ class child_window:
         # ========== 右侧扩展区域（宽度自适应剩余空间） ==========
         self.right_frame = tk.Frame(self.main_paned, bg="white")
         self.main_paned.add(self.right_frame, minsize=400)  
+        self.fig, self.ax = plt.subplots()
+        self.plot_canvas = FigureCanvas(self.fig, self.ax, self.right_frame)
         
        
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)#将叉号绑定_on_close函数
