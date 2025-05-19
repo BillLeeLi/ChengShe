@@ -62,7 +62,7 @@ def calc(expr: str):
     try:
         with warnings.catch_warnings():  # 忽略计算中的异常，只捕获算式不合法导致的错误
             warnings.simplefilter("ignore", category=RuntimeWarning)
-            res = eval(expr, {"np": np, "π": np.pi, "__builtins__": {}})
+            res = eval(expr, {"np": np, "π": np.pi, "e": np.e, "__builtins__": {}})
             return str(res)
     except Exception as e:
         print(e)  # 用于测试，后期会注释掉
@@ -72,8 +72,7 @@ def calc(expr: str):
 
 class FigureCanvas:
     def __init__(self, fig, ax, parent):
-        # fig是绑定的图像，ax是轴，parent是父窗口
-        # 成员都设置为私有的
+        # 成员都设置私有的
         self.__ax = ax
         self.__plot_canvas = FigureCanvasTkAgg(fig, master=parent)
         self.__toolbar = NavigationToolbar2Tk(self.__plot_canvas, parent)
@@ -86,8 +85,10 @@ class FigureCanvas:
         self.__ax.set_ylim(-10, 10)
         self.__ax.set_aspect("equal")
         self.__ax.grid(True)
-        self.__ax.callbacks.connect("xlim_changed", self.__on_xlim_changed)
-        self.__lines = {}
+        self.__ax.callbacks.connect("xlim_changed", self.__on_view_changed)
+        self.__ax.callbacks.connect("ylim_changed", self.__on_view_changed)
+        self.__lines = {}  # 普通函数图像
+        self.__is_updating = False  # 记录图像是否在更新，避免无限的递归调用
 
     # 为了方便把处理字符串的两个函数合成一个类方法了
     def __process(self, expr: str):
@@ -107,7 +108,10 @@ class FigureCanvas:
             try:
                 with warnings.catch_warnings():  # 忽略计算中的警告，只捕获算式不合法导致的错误
                     warnings.simplefilter("ignore", category=RuntimeWarning)
-                    ys = eval(expr, {"np": np, "x": xs, "π": np.pi, "__builtins__": {}})
+                    ys = eval(
+                        expr,
+                        {"np": np, "x": xs, "π": np.pi, "e": np.e, "__builtins__": {}},
+                    )
                     # 把图像保存下来，方便之后操作
                     self.__lines[expr] = self.__ax.plot(xs, ys)[0]
                     self.__plot_canvas.draw()
@@ -116,7 +120,44 @@ class FigureCanvas:
                 messagebox.showerror(title="错误", message="请检查函数表达式")
         else:
             # 绘制隐函数图像
-            pass
+            x_min, x_max = self.__ax.get_xlim()
+            y_min, y_max = self.__ax.get_ylim()
+            xs = np.linspace(x_min, x_max, 1000)
+            ys = np.linspace(y_min, y_max, 1000)
+            X, Y = np.meshgrid(xs, ys)
+
+            left, right = expr.split("=")  # 等式一分为二
+            left, right = left.strip(), right.strip()
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    F = eval(
+                        left,
+                        {
+                            "x": X,
+                            "y": Y,
+                            "np": np,
+                            "π": np.pi,
+                            "e": np.e,
+                            "__builtins__": {},
+                        },
+                    ) - eval(
+                        right,
+                        {
+                            "x": X,
+                            "y": Y,
+                            "np": np,
+                            "π": np.pi,
+                            "e": np.e,
+                            "__builtins__": {},
+                        },
+                    )  # 写成左减去右的形式
+
+                    self.__lines[expr] = plt.contour(X, Y, F, levels=[0])  # 绘制等高线
+                    self.__plot_canvas.draw()
+            except Exception as e:
+                print(e)
+                messagebox.showerror(title="错误", message="请检查隐函数表达式")
 
     # 删除expr对应的函数图像
     def delete_plots(self, expr: str):
@@ -126,19 +167,74 @@ class FigureCanvas:
             line.remove()
             self.__plot_canvas.draw()
 
-    def __on_xlim_changed(self, event):
+    def __on_view_changed(self, event):
+        if self.__is_updating:
+            return
+        self.__is_updating = True
         self.__update_plot()
+        self.__is_updating = False
 
     def __update_plot(self):
+        # print(self.__lines)
         x_min, x_max = self.__ax.get_xlim()
         xs = np.linspace(x_min, x_max, 1000)
         for expr, line in self.__lines.items():
-            try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", category=RuntimeWarning)
-                    ys = eval(expr, {"np": np, "x": xs, "π": np.pi, "__builtins__": {}})
-                    line.set_data(xs, ys)
-                    self.__plot_canvas.draw_idle()
-            except Exception as e:
-                print(e)
-                messagebox.showerror(title="错误", message="请检查函数表达式")
+            if not "=" in expr:
+                # 普通函数
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", category=RuntimeWarning)
+                        ys = eval(
+                            expr,
+                            {
+                                "np": np,
+                                "x": xs,
+                                "π": np.pi,
+                                "e": np.e,
+                                "__builtins__": {},
+                            },
+                        )
+                        line.set_data(xs, ys)
+                        self.__plot_canvas.draw_idle()
+                except Exception as e:
+                    print(e)
+                    messagebox.showerror(title="错误", message="请检查函数表达式")
+            else:
+                # 隐函数
+                y_min, y_max = self.__ax.get_ylim()
+                ys = np.linspace(y_min, y_max, 1000)
+                X, Y = np.meshgrid(xs, ys)
+
+                left, right = expr.split("=")
+                left, right = left.strip(), right.strip()
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", category=RuntimeWarning)
+                        F = eval(
+                            left,
+                            {
+                                "x": X,
+                                "y": Y,
+                                "np": np,
+                                "π": np.pi,
+                                "e": np.e,
+                                "__builtins__": {},
+                            },
+                        ) - eval(
+                            right,
+                            {
+                                "x": X,
+                                "y": Y,
+                                "np": np,
+                                "π": np.pi,
+                                "e": np.e,
+                                "__builtins__": {},
+                            },
+                        )
+                        cs = self.__lines[expr]
+                        cs.remove()
+                        self.__lines[expr] = plt.contour(X, Y, F, levels=[0])
+                        self.__plot_canvas.draw_idle()
+                except Exception as e:
+                    print(e)
+                    messagebox.showerror(title="错误", message="请检查隐函数表达式")
