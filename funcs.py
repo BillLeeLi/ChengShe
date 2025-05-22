@@ -238,3 +238,75 @@ class FigureCanvas:
                 except Exception as e:
                     print(e)
                     messagebox.showerror(title="错误", message="请检查隐函数表达式")
+
+
+def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
+    """
+    对于给定的函数表达式expr,求出在x_range区间内的全部零点
+    error是误差,由于数值求解方程时存在误差,只有差值超过error我们才认为过程中求出的两个根不是同一个根
+    """
+    if "=" in expr:
+        messagebox.showerror(title="错误", message="请输入函数表达式而非等式")
+        return
+    if x_range[0] > x_range[1]:
+        x_range[0], x_range[1] = x_range[1], x_range[0]
+    expr = insert_multiplication(expr)
+    # sympy库中有常见函数，不需要给函数名前加上np.
+    x = sympy.symbols("x")
+    try:
+        func = sympy.lambdify(x, expr, "numpy")  # func是转化为函数
+    except Exception as e:
+        print(e)
+        messagebox.showerror(title="错误", message="请检查函数表达式")
+    xs = np.linspace(x_range[0], x_range[1], 1000)
+    roots = []
+
+    for s in xs:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                root = scipy.optimize.fsolve(func, s)[0]
+                # 如果根介于区间内且与之前出现过的所有根不同
+                if (not any(abs(root - r) < error for r in roots)) and x_range[
+                    0
+                ] - error < root < x_range[1] + error:
+                    roots.append(root)
+        except Exception as e:
+            print(e)
+            messagebox.showerror(title="错误", message="请检查函数表达式")
+
+    return sorted(roots)  # 返回升序排列的区间内的所有根
+
+
+def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
+    """
+    对于给定的函数表达式expr,求出在x_range区间内的全部极值点和极值,返回值是元组(极值点, 极值)的数组
+    error是误差
+    只能计算普通函数的极值点,不能计算隐函数的极值点
+    """
+    expr = insert_multiplication(expr)
+    try:
+        expr = sympy.sympify(expr)  # 转化为sympy表达式，否则下面不能用于进行求导运算
+        x = sympy.symbols("x")
+        derived_func1 = sympy.diff(expr, x)  # 一阶导数
+        stag_points = find_roots(
+            str(derived_func1), x_range=x_range, error=error
+        )  # 所有驻点
+        extr_points = []
+        for sp in stag_points:
+            # 检验驻点是不是极值点，需要依次求导
+            i = 2  # 记录导数的阶数
+            dfunc = derived_func1
+            while True:  # 一直求导下去，直到导函数在驻点的值不为零
+                dfunc = sympy.diff(dfunc, x)
+                if abs(dfunc.subs(x, sp).evalf()) > 1e-5:
+                    # 这一阶导数不是0,偶数阶是极值点，奇数阶不是极值点
+                    if i % 2 == 0:
+                        extr_points.append(sp)
+                    break
+                i += 1
+        return extr_points
+    except Exception as e:
+        print(e)
+        messagebox.showerror(title="错误", message="请检查函数表达式")
+        return
