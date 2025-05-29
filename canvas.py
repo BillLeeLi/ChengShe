@@ -43,6 +43,10 @@ class Line:
         self.id = canvas.create_line(x1, y1, x2, y2, width=3)
         self.canvas = canvas
         self.canvas.tag_bind(self.id, "<Motion>", self.motion)
+        self.x1 = x1
+        self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
 
     def motion(self, event):
         self.wider()
@@ -216,6 +220,51 @@ class myCanvas:
         if clicked_id in self.circles:
             self.circles.pop(clicked_id)
 
+    def delete_all(self):
+        for id, _ in self.points.items():
+            self.canvas.delete(id)
+        self.points.clear()
+        for id, _ in self.lines.items():
+            self.canvas.delete(id)
+        self.lines.clear()
+        for id, _ in self.circles.items():
+            self.canvas.delete(id)
+        self.circles.clear()
+
+    def start_draw_midpoint(self):
+        points = []
+        self.canvas.bind(
+            "<Button-1>", lambda event: self.__draw_midpoint(event=event, points=points)
+        )
+
+    def __draw_midpoint(self, event: tk.Event, points: list):
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        flag = False
+        min_dis = inf
+
+        # 如果这个是已经存在的点，我们取距离最近的点
+        for _, p in self.points.items():
+            dis = sqrt((p.center()[0] - x) ** 2 + (p.center()[1] - y) ** 2)
+            if dis < 7 and dis < min_dis:
+                tp = p
+                min_dis = dis
+                flag = True
+                # print("已存在的点!")
+        if not flag:
+            tp = Point(self.canvas, x, y)
+            self.points[tp.id] = tp
+
+        points.append(tp)
+        if len(points) == 2:
+            p1, p2 = points[0], points[1]
+            points.clear()
+            p = Point(
+                self.canvas,
+                x=(p1.center()[0] + p2.center()[0]) / 2,
+                y=(p1.center()[1] + p2.center()[1]) / 2,
+            )
+            self.points[p.id] = p
+
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -225,5 +274,7 @@ if __name__ == "__main__":
     tk.Button(root, text="线", command=canvas.start_draw_lines).pack()
     tk.Button(root, text="圆", command=canvas.start_draw_circles).pack()
     tk.Button(root, text="删除", command=canvas.start_delete).pack()
+    tk.Button(root, text="清屏", command=canvas.delete_all).pack()
+    tk.Button(root, text="中点", command=canvas.start_draw_midpoint).pack()
 
     tk.mainloop()
