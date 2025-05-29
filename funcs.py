@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import sympy
-import scipy
+import scipy.optimize
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -16,7 +16,7 @@ def insert_multiplication(expr: str):
     返回值是插入*之后的字符串
     """
     expr = re.sub(
-        r"([xyeπ\d\)])([πa-zA-Z\(])", r"\1*\2", expr
+        r"([xyeπαβγ\d\)])([παβγa-zA-Z\(])", r"\1*\2", expr
     )  # 数字、xyeπ或)在左且(、字母和π在右的时候中间加上*
     print(expr)
     return expr
@@ -71,7 +71,15 @@ def calc(expr: str):
 
 
 class FigureCanvas:
-    def __init__(self, fig, ax, parent):
+    def __init__(
+        self,
+        fig,
+        ax,
+        parent,
+        alpha: tk.DoubleVar,
+        beta: tk.DoubleVar,
+        gamma: tk.DoubleVar,
+    ):
         # 成员都设置私有的
         self.__ax = ax
         self.__plot_canvas = FigureCanvasTkAgg(fig, master=parent)
@@ -89,6 +97,9 @@ class FigureCanvas:
         self.__ax.callbacks.connect("ylim_changed", self.__on_view_changed)
         self.__lines = {}  # 普通函数图像
         self.__is_updating = False  # 记录图像是否在更新，避免无限的递归调用
+        self.__alpha = alpha
+        self.__beta = beta
+        self.__gamma = gamma
 
     # 为了方便把处理字符串的两个函数合成一个类方法了
     def __process(self, expr: str):
@@ -102,6 +113,11 @@ class FigureCanvas:
         if expr in self.__lines:  # 这条图像已经在画布中了
             return
 
+        parameters = {
+            "α": self.__alpha.get(),
+            "β": self.__beta.get(),
+            "γ": self.__gamma.get(),
+        }  # 参数和对应值的字典
         if not "=" in expr:  # 绘制普通函数图像
             x_min, x_max = self.__ax.get_xlim()
             xs = np.linspace(x_min, x_max, 1000)
@@ -111,6 +127,7 @@ class FigureCanvas:
                     ys = eval(
                         expr,
                         {"np": np, "x": xs, "π": np.pi, "e": np.e, "__builtins__": {}},
+                        parameters,
                     )
                     # 把图像保存下来，方便之后操作
                     self.__lines[expr] = self.__ax.plot(xs, ys)[0]
@@ -141,6 +158,7 @@ class FigureCanvas:
                             "e": np.e,
                             "__builtins__": {},
                         },
+                        parameters,
                     ) - eval(
                         right,
                         {
@@ -151,6 +169,7 @@ class FigureCanvas:
                             "e": np.e,
                             "__builtins__": {},
                         },
+                        parameters,
                     )  # 写成左减去右的形式
 
                     self.__lines[expr] = plt.contour(X, Y, F, levels=[0])  # 绘制等高线
@@ -171,13 +190,18 @@ class FigureCanvas:
         if self.__is_updating:
             return
         self.__is_updating = True
-        self.__update_plot()
+        self.__update_plots()
         self.__is_updating = False
 
-    def __update_plot(self):
+    def __update_plots(self):
         # print(self.__lines)
         x_min, x_max = self.__ax.get_xlim()
         xs = np.linspace(x_min, x_max, 1000)
+        parameters = {
+            "α": self.__alpha.get(),
+            "β": self.__beta.get(),
+            "γ": self.__gamma.get(),
+        }  # 设置参数和值的对应关系
         for expr, line in self.__lines.items():
             if not "=" in expr:
                 # 普通函数
@@ -193,6 +217,7 @@ class FigureCanvas:
                                 "e": np.e,
                                 "__builtins__": {},
                             },
+                            parameters,
                         )
                         line.set_data(xs, ys)
                         self.__plot_canvas.draw_idle()
@@ -220,6 +245,7 @@ class FigureCanvas:
                                 "e": np.e,
                                 "__builtins__": {},
                             },
+                            parameters,
                         ) - eval(
                             right,
                             {
@@ -230,6 +256,7 @@ class FigureCanvas:
                                 "e": np.e,
                                 "__builtins__": {},
                             },
+                            parameters,
                         )
                         cs = self.__lines[expr]
                         cs.remove()
