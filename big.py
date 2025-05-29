@@ -112,7 +112,7 @@ class child_window:
         exist=True
         self.window = tk.Toplevel(parent)
         self.window.title("画布")
-        self.window.geometry("900x500")  # 增大窗口尺寸
+        self.window.geometry("1000x600")  # 增大窗口尺寸
         self.current_act=1
         self.entries=[]
         
@@ -125,8 +125,9 @@ class child_window:
         self.main_paned.add(self.left_frame, width=300)  # 固定左侧宽度
         
         # 初始化5个固定输入框
+        #self.create_scale()
         self._create_inputs()
-        
+        #self.create_scale()
         # ========== 右侧扩展区域（宽度自适应剩余空间） ==========
         self.right_frame = tk.Frame(self.main_paned, bg="white")
         self.main_paned.add(self.right_frame, minsize=400)  
@@ -140,10 +141,20 @@ class child_window:
         global exist
         exist=False
         self.window.destroy()
+    def create_scale(self):
+        container=tk.Frame(self.left_frame, bg="#f0f0f0")
+        container.pack(fill=tk.BOTH, expand=True, padx=5)
+        
+
+
     def update(self):
         entry=self.entries[5]
         entry.delete(0,tk.END)
         entry.insert(0,f"方程{self.current_act}")
+        names=['α','β','γ']
+        for name in names:
+            self.slider_vars[name]['var'].set(0)
+            self.slider_vars[name]['label'].config(text="0")
         
     def _create_inputs(self):
         
@@ -205,13 +216,82 @@ class child_window:
         entry = ttk.Entry(row_frame, width=18)
         entry.grid(row=0, column=1, padx=2, sticky="ew")
         self.entries.append(entry)
-        # 调整列权重（让输入框列自动扩展）
         row_frame.columnconfigure(1, weight=1)
+        # 调整列权重（让输入框列自动扩展）
+        self.slider_vars={}
+        params=[('α', 0, 100), ('β', -10, 10), ('γ', 0, 1)]
+        for i,(name,min,max) in enumerate(params):
+            slider_frame = tk.Frame(input_container, bg="#f0f0f0")
+            slider_frame.grid(row=i+8, column=0, sticky="ew", pady=5)
+            
+            label=tk.Label(slider_frame,text=name)
+            label.grid(row=0,column=0,padx=2)
+            var=tk.DoubleVar()
+            scale=ttk.Scale(slider_frame,variable=var,from_=min,to=max,orient=tk.HORIZONTAL,
+                            command=lambda v=0,n=name:self.update_value(n,v))#v即为滑块绑定的var变量
+            scale.grid(row=0,column=1,padx=2,sticky="ew")
+            value_label = tk.Label(
+                slider_frame,
+                text="0.0",
+                width=5,
+                bg="#f0f0f0"
+            )
+            value_label.grid(row=0, column=2, padx=2)
+            self.slider_vars[name]={'var':var,'label':value_label}
+            slider_frame.columnconfigure(1, weight=1)
+        
         
         # 容器列配置
         input_container.columnconfigure(0, weight=1)
+        self.create_toolbox(input_container)
+    def create_toolbox(self,parent):
+        toolbox_frame=tk.Frame(parent,bg="#f0f0f0")
+        toolbox_frame.grid(row=11, column=0, sticky="nsew", pady=10, padx=5)
+        lbl_toolbox = tk.Label(
+            toolbox_frame,
+            text="工具箱",
+            bg="#e0e0e0",
+            relief="ridge",
+            padx=5
+        )
+        lbl_toolbox.pack(fill=tk.BOTH, pady=(0,10))
+        btn_frame = tk.Frame(toolbox_frame, bg="#f0f0f0")
+        btn_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 定义工具集
+        tools = [
+            ("标极值点", self.extreme_point),
+            ("标零点", self.zero_point),
+            ("计算极值", self.calc_extreme),
+            ("画出导函数", self.draw_deri)
+        ]
+        for idx, (text, command) in enumerate(tools):
+            btn = ttk.Button(
+                btn_frame,
+                text=text,
+                command=command,
+                width=17
+            )
+            btn.grid(
+                row=idx//2,
+                column=idx%2,
+                padx=5,
+                pady=5,
+                sticky="nsew",
+                ipady=4
+            )
+    def extreme_point(self):
+        print("test")
+    def zero_point(self):
+        print("test")
+    def calc_extreme(self):
+        print("test")
+    def draw_deri(self):
+        print("test")
+    def update_value(self,name,value):
+        value=float(value)
+        self.slider_vars[name]['label'].config(text=f"{value:.2f}")
         
-    
     
     def edit_single(self,input_id):
         index=input_id-1
@@ -240,13 +320,13 @@ buttons = [
     (3, 0, '4'), (3, 1, '5'), (3, 2, '6'), (3, 3, '+'), (3, 4, '-'),(4, 6, ')'),(3,5,'Cos()'),
     
     
-    (4, 0, '1'), (4, 1, '2'), (4, 2, '3'), (4, 3, '=', 2),  # 跨2行
+    (4, 0, '1'), (4, 1, '2'), (4, 2, '3'), (4,3,'α'),(4,4,'β'),(4,5,'γ'),
     
     
-    (5, 0, '绘图'), (5, 1, '0'), (5, 2, '.'), (5,6,'🖌'),#(5, 4, '0'),
+    (5, 0, '绘图'), (5, 1, '0'), (5, 2, '.'), (5,6,'🖌'),(5, 4, '0'),(5, 3, '='),  
     
     
-    (4, 4, '←',2),(4,5,'AC',2)
+    (5, 4, '←'),(5,5,'AC')
 ]
 
 # 创建按钮
