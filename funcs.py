@@ -8,6 +8,14 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 import re
 import warnings
+from collections import defaultdict
+
+
+def _default_param():
+    # 返回一个字典，它有αβγ属性，默认值都是0.0
+    res = {}
+    res["α"] = res["β"] = res["γ"] = float()
+    return res
 
 
 def insert_multiplication(expr: str):
@@ -18,6 +26,8 @@ def insert_multiplication(expr: str):
     expr = re.sub(
         r"([xyeπαβγ\d\)])([παβγa-zA-Z\(])", r"\1*\2", expr
     )  # 数字、xyeπ或)在左且(、字母和π在右的时候中间加上*
+    expr = re.sub(r"ln", r"log", expr)  # ln转化为log
+    expr = re.sub(r"\^", r"**", expr)
     print(expr)
     return expr
 
@@ -63,7 +73,7 @@ def calc(expr: str):
         with warnings.catch_warnings():  # 忽略计算中的异常，只捕获算式不合法导致的错误
             warnings.simplefilter("ignore", category=RuntimeWarning)
             res = eval(expr, {"np": np, "π": np.pi, "e": np.e, "__builtins__": {}})
-            return str(res)
+            return f"{res:.9f}"
     except Exception as e:
         print(e)  # 用于测试，后期会注释掉
         messagebox.showerror(title="错误", message="请检查算术表达式")
@@ -96,6 +106,8 @@ class FigureCanvas:
         self.__ax.callbacks.connect("xlim_changed", self.__on_view_changed)
         self.__ax.callbacks.connect("ylim_changed", self.__on_view_changed)
         self.__lines = {}  # 普通函数图像
+        self.__derived = {}
+        self.__parameters = defaultdict(_default_param)
         self.__is_updating = False  # 记录图像是否在更新，避免无限的递归调用
         self.__alpha = alpha
         self.__beta = beta
@@ -129,6 +141,9 @@ class FigureCanvas:
                         {"np": np, "x": xs, "π": np.pi, "e": np.e, "__builtins__": {}},
                         parameters,
                     )
+                    if "x" not in expr:
+                        # 如果没有出现x，上面的eval返回值会是单个数值而不是数组
+                        ys = [ys for _ in range(1000)]
                     # 把图像保存下来，方便之后操作
                     self.__lines[expr] = self.__ax.plot(xs, ys)[0]
                     self.__plot_canvas.draw()
@@ -178,6 +193,23 @@ class FigureCanvas:
                 print(e)
                 messagebox.showerror(title="错误", message="请检查隐函数表达式")
 
+    def draw_plots2(self, func):
+        """
+        与draw_plots的效果相同,但是接受的参数是函数而不是字符串
+        """
+        x_min, x_max = self.__ax.get_xlim()
+        xs = np.linspace(x_min, x_max, 1000)
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                ys = func(xs)
+                self.__derived[func] = self.__ax.plot(xs, ys)[0]
+                self.__plot_canvas.draw()
+        except Exception as e:
+            print(e)
+            print("hello")
+            messagebox.showerror(title="错误", message="请检查函数表达式")
+
     # 删除expr对应的函数图像
     def delete_plots(self, expr: str):
         expr = self.__process(expr)
@@ -197,12 +229,12 @@ class FigureCanvas:
         # print(self.__lines)
         x_min, x_max = self.__ax.get_xlim()
         xs = np.linspace(x_min, x_max, 1000)
-        parameters = {
-            "α": self.__alpha.get(),
-            "β": self.__beta.get(),
-            "γ": self.__gamma.get(),
-        }  # 设置参数和值的对应关系
         for expr, line in self.__lines.items():
+            parameters = {
+                "α": self.__parameters[expr]["α"],
+                "β": self.__parameters[expr]["β"],
+                "γ": self.__parameters[expr]["γ"],
+            }  # 这里的参数是存放在字典中的值
             if not "=" in expr:
                 # 普通函数
                 try:
@@ -219,6 +251,8 @@ class FigureCanvas:
                             },
                             parameters,
                         )
+                        if "x" not in expr:
+                            ys = [ys for _ in range(1000)]
                         line.set_data(xs, ys)
                         self.__plot_canvas.draw_idle()
                 except Exception as e:
@@ -265,6 +299,101 @@ class FigureCanvas:
                 except Exception as e:
                     print(e)
                     messagebox.showerror(title="错误", message="请检查隐函数表达式")
+        for func, line in self.__derived.items():
+            x_min, x_max = self.__ax.get_xlim()
+            xs = np.linspace(x_min, x_max, 1000)
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    ys = func(xs)
+                    line.set_data(xs, ys)
+                    self.__plot_canvas.draw_idle()
+            except Exception as e:
+                print(e)
+                pass
+
+    def update_one_plot(self, expr):
+        expr = self.__process(expr=expr)
+        if expr not in self.__lines:
+            return
+
+        # 更新三个参数
+        self.__parameters[expr]["α"] = self.__alpha.get()
+        self.__parameters[expr]["β"] = self.__beta.get()
+        self.__parameters[expr]["γ"] = self.__gamma.get()
+        parameters = {
+            "α": self.__parameters[expr]["α"],
+            "β": self.__parameters[expr]["β"],
+            "γ": self.__parameters[expr]["γ"],
+        }  # 这里的参数是存放在字典中的值
+
+        x_min, x_max = self.__ax.get_xlim()
+        xs = np.linspace(x_min, x_max, 1000)
+        line = self.__lines[expr]
+        if not "=" in expr:
+            # 普通函数
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    ys = eval(
+                        expr,
+                        {
+                            "np": np,
+                            "x": xs,
+                            "π": np.pi,
+                            "e": np.e,
+                            "__builtins__": {},
+                        },
+                        parameters,
+                    )
+                    if "x" not in expr:
+                        ys = [ys for _ in range(1000)]
+                    line.set_data(xs, ys)
+                    self.__plot_canvas.draw_idle()
+            except Exception as e:
+                print(e)
+                messagebox.showerror(title="错误", message="请检查函数表达式")
+        else:
+            # 隐函数
+            y_min, y_max = self.__ax.get_ylim()
+            ys = np.linspace(y_min, y_max, 1000)
+            X, Y = np.meshgrid(xs, ys)
+
+            left, right = expr.split("=")
+            left, right = left.strip(), right.strip()
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    F = eval(
+                        left,
+                        {
+                            "x": X,
+                            "y": Y,
+                            "np": np,
+                            "π": np.pi,
+                            "e": np.e,
+                            "__builtins__": {},
+                        },
+                        parameters,
+                    ) - eval(
+                        right,
+                        {
+                            "x": X,
+                            "y": Y,
+                            "np": np,
+                            "π": np.pi,
+                            "e": np.e,
+                            "__builtins__": {},
+                        },
+                        parameters,
+                    )
+                    cs = self.__lines[expr]
+                    cs.remove()
+                    self.__lines[expr] = plt.contour(X, Y, F, levels=[0])
+                    self.__plot_canvas.draw_idle()
+            except Exception as e:
+                print(e)
+                messagebox.showerror(title="错误", message="请检查隐函数表达式")
 
 
 def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
@@ -288,19 +417,21 @@ def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
     xs = np.linspace(x_range[0], x_range[1], 1000)
     roots = []
 
-    for s in xs:
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=RuntimeWarning)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            for s in xs:
                 root = scipy.optimize.fsolve(func, s)[0]
                 # 如果根介于区间内且与之前出现过的所有根不同
-                if (not any(abs(root - r) < error for r in roots)) and x_range[
-                    0
-                ] - error < root < x_range[1] + error:
-                    roots.append(root)
-        except Exception as e:
-            print(e)
-            messagebox.showerror(title="错误", message="请检查函数表达式")
+                if (
+                    (not any(abs(root - r) < error for r in roots))
+                    and x_range[0] - error < root < x_range[1] + error
+                    and abs(func(root)) < error
+                ):
+                    roots.append(float(f"{root:.7f}"))
+    except Exception as e:
+        print(e)
+        messagebox.showerror(title="错误", message="请检查函数表达式")
 
     return sorted(roots)  # 返回升序排列的区间内的所有根
 
@@ -312,6 +443,9 @@ def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
     只能计算普通函数的极值点,不能计算隐函数的极值点
     """
     expr = insert_multiplication(expr)
+    if "=" in expr:
+        messagebox.showerror(title="错误", message="请输入函数表达式而非等式")
+        return
     try:
         expr = sympy.sympify(expr)  # 转化为sympy表达式，否则下面不能用于进行求导运算
         x = sympy.symbols("x")
@@ -326,14 +460,27 @@ def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
             dfunc = derived_func1
             while True:  # 一直求导下去，直到导函数在驻点的值不为零
                 dfunc = sympy.diff(dfunc, x)
-                if abs(dfunc.subs(x, sp).evalf()) > 1e-5:
-                    # 这一阶导数不是0,偶数阶是极值点，奇数阶不是极值点
+                if abs(dfunc.subs(x, sp).evalf()) > error:
+                    # 这一阶导数不是0,偶数阶是极值点,奇数阶不是极值点
                     if i % 2 == 0:
-                        extr_points.append(sp)
+                        extr_points.append((sp, expr.subs(x, sp)))
                     break
                 i += 1
         return extr_points
     except Exception as e:
         print(e)
         messagebox.showerror(title="错误", message="请检查函数表达式")
-        return
+
+
+def get_derived(expr: str):
+    expr = insert_multiplication(expr)
+    try:
+        x = sympy.symbols("x")
+        func = sympy.sympify(expr)
+        derived_func = sympy.diff(func, x)
+        if isinstance(derived_func, sympy.Number):
+            return lambda x: np.full_like(x, float(derived_func))
+        return sympy.lambdify(x, derived_func, "numpy")
+    except Exception as e:
+        print(e)
+        messagebox.showerror(title="错误", message="请检查函数表达式")
