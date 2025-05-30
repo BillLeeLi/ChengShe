@@ -132,7 +132,14 @@ class child_window:
         self.right_frame = tk.Frame(self.main_paned, bg="white")
         self.main_paned.add(self.right_frame, minsize=400)  
         self.fig, self.ax = plt.subplots()
-        self.plot_canvas = FigureCanvas(self.fig, self.ax, self.right_frame)
+        self.figCanvas = FigureCanvas(
+            self.fig,
+            self.ax,
+            self.right_frame,
+            self.slider_vars["α"]["var"],
+            self.slider_vars["β"]["var"],
+            self.slider_vars["γ"]["var"],
+        )
         
        
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)#将叉号绑定_on_close函数
@@ -223,12 +230,18 @@ class child_window:
         for i,(name,min,max) in enumerate(params):
             slider_frame = tk.Frame(input_container, bg="#f0f0f0")
             slider_frame.grid(row=i+8, column=0, sticky="ew", pady=5)
+
+            def _on_scale_moved(n, v):
+                self.update_value(n, v)  # 更新标签
+                cur_act = self.current_act  # 当前在操作的对象
+                expr = self.entries[cur_act - 1].get()
+                self.figCanvas.update_one_plot(expr=expr)
             
             label=tk.Label(slider_frame,text=name)
             label.grid(row=0,column=0,padx=2)
             var=tk.DoubleVar()
             scale=ttk.Scale(slider_frame,variable=var,from_=min,to=max,orient=tk.HORIZONTAL,
-                            command=lambda v=0,n=name:self.update_value(n,v))#v即为滑块绑定的var变量
+                            command=lambda v=0, n=name: _on_scale_moved(n, v),)#v即为滑块绑定的var变量
             scale.grid(row=0,column=1,padx=2,sticky="ew")
             value_label = tk.Label(
                 slider_frame,
@@ -281,26 +294,87 @@ class child_window:
                 ipady=4
             )
     def extreme_point(self):
-        print("test")
+        cur_act = self.current_act
+        entry = self.entries[cur_act - 1]
+        # 把表达式里面的全部参数替换为对应的数值
+        expr = entry.get()
+        alpha_val = self.slider_vars["α"]["var"].get()
+        beta_val = self.slider_vars["β"]["var"].get()
+        gamma_val = self.slider_vars["γ"]["var"].get()
+        re.sub(r"α", f"{alpha_val}", expr)
+        re.sub(r"β", f"{beta_val}", expr)
+        re.sub(r"γ", f"{gamma_val}", expr)
+        extr_points = find_extreme_points(expr, self.ax.get_xlim())
+        print(extr_points)
+        if len(extr_points) > 0:
+            xs = [float(p[0]) for p in extr_points]
+            ys = [float(p[1]) for p in extr_points]
+            self.ax.plot(xs, ys, linestyle="None", marker="o")
+            self.figCanvas._FigureCanvas__plot_canvas.draw()
+            
     def zero_point(self):
-        print("test")
+        cur_act = self.current_act
+        entry = self.entries[cur_act - 1]
+        expr = entry.get()
+        expr = insert_multiplication(expr)
+        alpha_val = self.slider_vars["α"]["var"].get()
+        beta_val = self.slider_vars["β"]["var"].get()
+        gamma_val = self.slider_vars["γ"]["var"].get()
+        re.sub(r"α", f"{alpha_val}", expr)
+        re.sub(r"β", f"{beta_val}", expr)
+        re.sub(r"γ", f"{gamma_val}", expr)
+        roots = find_roots(entry.get(), self.ax.get_xlim())
+        print(roots)
+        ys = np.zeros(len(roots))
+        self.ax.plot(roots, ys, linestyle="None", marker="o")
+        self.figCanvas._FigureCanvas__plot_canvas.draw()
+        
     def calc_extreme(self):
-        print("test")
+        cur_act = self.current_act
+        entry = self.entries[cur_act - 1]
+        # 把表达式里面的全部参数替换为对应的数值
+        expr = entry.get()
+        alpha_val = self.slider_vars["α"]["var"].get()
+        beta_val = self.slider_vars["β"]["var"].get()
+        gamma_val = self.slider_vars["γ"]["var"].get()
+        re.sub(r"α", f"{alpha_val}", expr)
+        re.sub(r"β", f"{beta_val}", expr)
+        re.sub(r"γ", f"{gamma_val}", expr)
+        extr_points = find_extreme_points(expr, self.ax.get_xlim())
+        info = "极值点\t  极值\n"
+        for x, y in extr_points:
+            info += f"{x}\t  {y:.7f}\n"
+        messagebox.showinfo(title="极值点和极值", message=info)
+        
     def draw_deri(self):
-        print("test")
+        cur_act = self.current_act
+        entry = self.entries[cur_act - 1]
+        expr = entry.get()
+        expr = insert_multiplication(expr)
+        alpha_val = self.slider_vars["α"]["var"].get()
+        beta_val = self.slider_vars["β"]["var"].get()
+        gamma_val = self.slider_vars["γ"]["var"].get()
+        re.sub(r"α", f"{alpha_val}", expr)
+        re.sub(r"β", f"{beta_val}", expr)
+        re.sub(r"γ", f"{gamma_val}", expr)
+        derived_func = get_derived(expr=expr)
+        self.figCanvas.draw_plots2(derived_func)
+        
     def update_value(self,name,value):
         value=float(value)
-        self.slider_vars[name]['label'].config(text=f"{value:.2f}")
-        
+        self.slider_vars[name]['label'].config(text=f"{value:.2f}")        
     
     def edit_single(self,input_id):
         index=input_id-1
         self.current_act=input_id
         self.update()
+        
     def clear_single(self, input_id):
         """清空指定输入框"""
         index=input_id-1
         entry = self.entries[index]  # 第2个子组件是输入框
+        expr = entry.get()  # 表达式
+        self.figCanvas.delete_plots(expr=expr)  # 删除表达式对应的函数
         entry.delete(0, tk.END)
 def open_graph():
     child_window(root)
