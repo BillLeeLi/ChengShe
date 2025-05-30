@@ -403,7 +403,7 @@ def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
     """
     if "=" in expr:
         messagebox.showerror(title="错误", message="请输入函数表达式而非等式")
-        return
+        return []
     if x_range[0] > x_range[1]:
         x_range[0], x_range[1] = x_range[1], x_range[0]
     expr = insert_multiplication(expr)
@@ -445,7 +445,7 @@ def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
     expr = insert_multiplication(expr)
     if "=" in expr:
         messagebox.showerror(title="错误", message="请输入函数表达式而非等式")
-        return
+        return []
     try:
         expr = sympy.sympify(expr)  # 转化为sympy表达式，否则下面不能用于进行求导运算
         x = sympy.symbols("x")
