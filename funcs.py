@@ -18,6 +18,10 @@ def _default_param():
     return res
 
 
+def _default_false():
+    return False
+
+
 def insert_multiplication(expr: str):
     """
     该方法接受一个字符串expr,作用是为表达式插入*,因为在习惯上某些数学表达式往往省去乘号
@@ -106,12 +110,22 @@ class FigureCanvas:
         self.__ax.callbacks.connect("xlim_changed", self.__on_view_changed)
         self.__ax.callbacks.connect("ylim_changed", self.__on_view_changed)
         self.__lines = {}  # 普通函数图像
-        self.__derived = {}
         self.__parameters = defaultdict(_default_param)
         self.__is_updating = False  # 记录图像是否在更新，避免无限的递归调用
         self.__alpha = alpha
         self.__beta = beta
         self.__gamma = gamma
+        self.__line_color = {}
+        self.__colors = {}
+        for color in ["red", "orange", "purple", "black", "pink", "silver"]:
+            self.__colors[color] = True
+        self.is_extrpts_exist = defaultdict(_default_false)  # 默认返回值Flase
+        self.extrpts = {}
+        self.is_zeropts_exist = defaultdict(_default_false)
+        self.zeropts = {}
+        self.is_derivedfunc_exist = defaultdict(_default_false)
+        self.derivedfunc = {}
+        self.derived = {}
 
     # 为了方便把处理字符串的两个函数合成一个类方法了
     def __process(self, expr: str):
@@ -187,7 +201,16 @@ class FigureCanvas:
                         parameters,
                     )  # 写成左减去右的形式
 
-                    self.__lines[expr] = plt.contour(X, Y, F, levels=[0])  # 绘制等高线
+                    color = "blue"
+                    for c, not_used in self.__colors.items():
+                        if not_used:
+                            color = c
+                            self.__colors[c] = False
+                            break
+                    self.__lines[expr] = plt.contour(
+                        X, Y, F, levels=[0], colors=color
+                    )  # 绘制等高线
+                    self.__line_color[expr] = color
                     self.__plot_canvas.draw()
             except Exception as e:
                 print(e)
@@ -203,11 +226,11 @@ class FigureCanvas:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", RuntimeWarning)
                 ys = func(xs)
-                self.__derived[func] = self.__ax.plot(xs, ys)[0]
+                self.derived[func] = self.__ax.plot(xs, ys)[0]
                 self.__plot_canvas.draw()
         except Exception as e:
             print(e)
-            print("hello")
+            # print("hello")
             messagebox.showerror(title="错误", message="请检查函数表达式")
 
     # 删除expr对应的函数图像
@@ -215,6 +238,9 @@ class FigureCanvas:
         expr = self.__process(expr)
         if expr in self.__lines:
             line = self.__lines.pop(expr)
+            if "=" in expr:
+                # 如果是隐函数的图像，被删除的时候标记它的颜色为可以使用的
+                self.__colors[self.__line_color[expr]] = True
             line.remove()
             self.__plot_canvas.draw()
 
@@ -294,12 +320,14 @@ class FigureCanvas:
                         )
                         cs = self.__lines[expr]
                         cs.remove()
-                        self.__lines[expr] = plt.contour(X, Y, F, levels=[0])
+                        self.__lines[expr] = plt.contour(
+                            X, Y, F, levels=[0], colors=self.__line_color[expr]
+                        )
                         self.__plot_canvas.draw_idle()
                 except Exception as e:
                     print(e)
                     messagebox.showerror(title="错误", message="请检查隐函数表达式")
-        for func, line in self.__derived.items():
+        for func, line in self.derived.items():
             x_min, x_max = self.__ax.get_xlim()
             xs = np.linspace(x_min, x_max, 1000)
             try:
@@ -389,7 +417,9 @@ class FigureCanvas:
                     )
                     cs = self.__lines[expr]
                     cs.remove()
-                    self.__lines[expr] = plt.contour(X, Y, F, levels=[0])
+                    self.__lines[expr] = plt.contour(
+                        X, Y, F, levels=[0], colors=self.__line_color[expr]
+                    )
                     self.__plot_canvas.draw_idle()
             except Exception as e:
                 print(e)
@@ -410,16 +440,11 @@ def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
     # sympy库中有常见函数，不需要给函数名前加上np.
     x = sympy.symbols("x")
     try:
-        func = sympy.lambdify(x, expr, "numpy")  # func是转化为函数
-    except Exception as e:
-        print(e)
-        messagebox.showerror(title="错误", message="请检查函数表达式")
-    xs = np.linspace(x_range[0], x_range[1], 1000)
-    roots = []
-
-    try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
+            func = sympy.lambdify(x, expr, "numpy")  # func是转化为函数
+            xs = np.linspace(x_range[0], x_range[1], 1000)
+            roots = []
             for s in xs:
                 root = scipy.optimize.fsolve(func, s)[0]
                 # 如果根介于区间内且与之前出现过的所有根不同
@@ -428,12 +453,12 @@ def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
                     and x_range[0] - error < root < x_range[1] + error
                     and abs(func(root)) < error
                 ):
-                    roots.append(float(f"{root:.7f}"))
+                    roots.append(round(root, 7))
+            return sorted(roots)
     except Exception as e:
         print(e)
         messagebox.showerror(title="错误", message="请检查函数表达式")
-
-    return sorted(roots)  # 返回升序排列的区间内的所有根
+        return []
 
 
 def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
@@ -470,6 +495,7 @@ def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
     except Exception as e:
         print(e)
         messagebox.showerror(title="错误", message="请检查函数表达式")
+        return []
 
 
 def get_derived(expr: str):
