@@ -173,7 +173,7 @@ class child_window:
         names = ["α", "β", "γ"]
         for name in names:
             self.slider_vars[name]["var"].set(0)
-            self.slider_vars[name]["label"].config(text="0")
+            self.slider_vars[name]["label"].config(text="0.00")
 
     def _create_inputs(self):
 
@@ -414,8 +414,14 @@ class child_window:
 
 
 def open_graph():
-    child_window(root)
-
+    global graph_window
+    graph_window=child_window(root)
+def draw():
+    input=input_entry.get()
+    entry=graph_window.entries[graph_window.current_act-1]
+    entry.insert(0,input)
+    graph_window.figCanvas.draw_plots(input)
+    all_clear()
 
 # 定义按钮布局
 buttons = [
@@ -483,6 +489,8 @@ for params in buttons:
         btn.config(command=all_clear)
     elif text == "🖌":
         btn.config(command=open_graph)
+    elif text=="绘图":
+        btn.config(command=draw)
     else:
         btn.config(command=lambda t=text: insert_char(t))
 
