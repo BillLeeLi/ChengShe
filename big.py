@@ -289,42 +289,67 @@ class child_window:
         entry = self.entries[cur_act - 1]
         # 把表达式里面的全部参数替换为对应的数值
         expr = entry.get()
-        alpha_val = self.slider_vars["α"]["var"].get()
-        beta_val = self.slider_vars["β"]["var"].get()
-        gamma_val = self.slider_vars["γ"]["var"].get()
-        expr = re.sub(r"α", f"{alpha_val}", expr)
-        expr = re.sub(r"β", f"{beta_val}", expr)
-        expr = re.sub(r"γ", f"{gamma_val}", expr)
-        extr_points = find_extreme_points(expr, self.ax.get_xlim())
-        print(extr_points)
-        if len(extr_points) > 0:
-            xs = [float(p[0]) for p in extr_points]
-            ys = [float(p[1]) for p in extr_points]
-            self.ax.plot(xs, ys, linestyle="None", marker="o")
+        expr = insert_multiplication(expr)
+        tmp = expr
+        if not self.figCanvas.is_extrpts_exist[expr]:
+            # 极值点还未标出
+            alpha_val = self.slider_vars["α"]["var"].get()
+            beta_val = self.slider_vars["β"]["var"].get()
+            gamma_val = self.slider_vars["γ"]["var"].get()
+            expr = re.sub(r"α", f"{alpha_val}", expr)
+            expr = re.sub(r"β", f"{beta_val}", expr)
+            expr = re.sub(r"γ", f"{gamma_val}", expr)
+            extr_points = find_extreme_points(expr, self.ax.get_xlim())
+            print(extr_points)
+            if len(extr_points) > 0:
+                xs = [float(p[0]) for p in extr_points]
+                ys = [float(p[1]) for p in extr_points]
+                self.figCanvas.extrpts[tmp] = self.ax.plot(
+                    xs, ys, linestyle="None", marker="o"
+                )[0]
+                self.figCanvas._FigureCanvas__plot_canvas.draw()
+                self.figCanvas.is_extrpts_exist[tmp] = True
+        else:
+            # 极值点已经标出了
+            self.figCanvas.extrpts.pop(tmp).remove()  # 移出字典并消除图像
             self.figCanvas._FigureCanvas__plot_canvas.draw()
+            self.figCanvas.is_extrpts_exist[tmp] = False
 
     def zero_point(self):
         cur_act = self.current_act
         entry = self.entries[cur_act - 1]
         expr = entry.get()
         expr = insert_multiplication(expr)
-        alpha_val = self.slider_vars["α"]["var"].get()
-        beta_val = self.slider_vars["β"]["var"].get()
-        gamma_val = self.slider_vars["γ"]["var"].get()
-        expr = re.sub(r"α", f"{alpha_val}", expr)
-        expr = re.sub(r"β", f"{beta_val}", expr)
-        expr = re.sub(r"γ", f"{gamma_val}", expr)
-        roots = find_roots(entry.get(), self.ax.get_xlim())
-        print(roots)
-        ys = np.zeros(len(roots))
-        self.ax.plot(roots, ys, linestyle="None", marker="o")
-        self.figCanvas._FigureCanvas__plot_canvas.draw()
+        tmp = expr
+        if not self.figCanvas.is_zeropts_exist[expr]:
+            alpha_val = self.slider_vars["α"]["var"].get()
+            beta_val = self.slider_vars["β"]["var"].get()
+            gamma_val = self.slider_vars["γ"]["var"].get()
+            expr = re.sub(r"α", f"{alpha_val}", expr)
+            expr = re.sub(r"β", f"{beta_val}", expr)
+            expr = re.sub(r"γ", f"{gamma_val}", expr)
+            print(expr)
+            roots = find_roots(expr, self.ax.get_xlim())
+            print(roots)
+            if len(roots) > 0:
+                ys = np.zeros(len(roots))
+                self.figCanvas.zeropts[tmp] = self.ax.plot(
+                    roots, ys, linestyle="None", marker="o"
+                )[0]
+                self.figCanvas._FigureCanvas__plot_canvas.draw()
+                self.figCanvas.is_zeropts_exist[tmp] = True
+        else:
+            # 零点已经标出了
+            self.figCanvas.zeropts.pop(tmp).remove()  # 移出字典并消除图像
+            self.figCanvas._FigureCanvas__plot_canvas.draw()
+            self.figCanvas.is_zeropts_exist[tmp] = False
 
     def calc_extreme(self):
         cur_act = self.current_act
         entry = self.entries[cur_act - 1]
         # 把表达式里面的全部参数替换为对应的数值
         expr = entry.get()
+        expr = insert_multiplication(expr)
         alpha_val = self.slider_vars["α"]["var"].get()
         beta_val = self.slider_vars["β"]["var"].get()
         gamma_val = self.slider_vars["γ"]["var"].get()
@@ -342,14 +367,25 @@ class child_window:
         entry = self.entries[cur_act - 1]
         expr = entry.get()
         expr = insert_multiplication(expr)
-        alpha_val = self.slider_vars["α"]["var"].get()
-        beta_val = self.slider_vars["β"]["var"].get()
-        gamma_val = self.slider_vars["γ"]["var"].get()
-        expr = re.sub(r"α", f"{alpha_val}", expr)
-        expr = re.sub(r"β", f"{beta_val}", expr)
-        expr = re.sub(r"γ", f"{gamma_val}", expr)
-        derived_func = get_derived(expr=expr)
-        self.figCanvas.draw_plots2(derived_func)
+        tmp = expr
+        if not self.figCanvas.is_derivedfunc_exist[expr]:
+            alpha_val = self.slider_vars["α"]["var"].get()
+            beta_val = self.slider_vars["β"]["var"].get()
+            gamma_val = self.slider_vars["γ"]["var"].get()
+            expr = re.sub(r"α", f"{alpha_val}", expr)
+            expr = re.sub(r"β", f"{beta_val}", expr)
+            expr = re.sub(r"γ", f"{gamma_val}", expr)
+            # print(expr, "***")
+            print(expr, alpha_val, beta_val, gamma_val)
+            derived_func = get_derived(expr=expr)
+            self.figCanvas.draw_plots2(derived_func)
+            self.figCanvas.is_derivedfunc_exist[tmp] = True
+            self.figCanvas.derivedfunc[tmp] = derived_func
+        else:
+            derived_func = self.figCanvas.derivedfunc.pop(tmp)
+            self.figCanvas.derived.pop(derived_func).remove()
+            self.figCanvas._FigureCanvas__plot_canvas.draw()
+            self.figCanvas.is_derivedfunc_exist[tmp] = False
 
     def update_value(self, name, value):
         value = float(value)
