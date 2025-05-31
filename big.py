@@ -419,6 +419,7 @@ def open_graph():
 def draw():
     input=input_entry.get()
     entry=graph_window.entries[graph_window.current_act-1]
+    graph_window.clear_single(graph_window.current_act)
     entry.insert(0,input)
     graph_window.figCanvas.draw_plots(input)
     all_clear()
