@@ -3,6 +3,7 @@ from funcs import *
 from tkinter import ttk
 import matplotlib.pyplot as plt
 import sys
+from canvas import *
 
 
 def on_close():  # 终止程序
@@ -16,7 +17,9 @@ root.title("科学计算器")
 root.configure(bg="#f0f0f0")  # 设置背景色
 root.protocol("WM_DELETE_WINDOW", on_close)  # 确保在窗口关闭时会终止程序
 graph_window = None
-exist = False
+canvasWindow = None
+exist1 = False
+exist2 = False
 # 配置网格行列权重
 for col in range(5):
     root.columnconfigure(col, weight=1)
@@ -117,10 +120,10 @@ class child_window:
 
     def __init__(self, parent):
 
-        global exist
-        if exist:
+        global exist1
+        if exist1:
             return
-        exist = True
+        exist1 = True
         self.window = tk.Toplevel(parent)
         self.window.title("画布")
         self.window.geometry("1000x600")  # 增大窗口尺寸
@@ -158,8 +161,8 @@ class child_window:
         self.update()
 
     def _on_close(self):
-        global exist
-        exist = False
+        global exist1
+        exist1 = False
         self.window.destroy()
 
     def create_scale(self):
@@ -277,12 +280,83 @@ class child_window:
             ("标零点", self.zero_point),
             ("计算极值", self.calc_extreme),
             ("画出导函数", self.draw_deri),
+            ("随手画", self.create_canvas),
         ]
         for idx, (text, command) in enumerate(tools):
             btn = ttk.Button(btn_frame, text=text, command=command, width=17)
             btn.grid(
                 row=idx // 2, column=idx % 2, padx=5, pady=5, sticky="nsew", ipady=4
             )
+
+    class canvas_window:
+        def __init__(self, parent):
+            global exist2
+            if exist2:
+                return
+            exist2 = True
+            self.window = tk.Toplevel(parent)
+            self.window.title("随手画")
+            self.window.geometry("1000x600")  # 增大窗口尺寸
+            self.current_act = 1
+            self.entries = []
+
+            # 主布局容器（左右分割比例调整为1:2）
+            self.main_paned = tk.PanedWindow(
+                self.window, orient=tk.HORIZONTAL, sashwidth=5, sashrelief="ridge"
+            )
+            self.main_paned.pack(fill=tk.BOTH, expand=True)
+
+            # ========== 左侧输入框区域（宽度300） ==========
+            self.left_frame = tk.Frame(self.main_paned, bg="#f0f0f0")
+            self.main_paned.add(self.left_frame, width=300)  # 固定左侧宽度
+
+            # ========== 右侧扩展区域（宽度自适应剩余空间） ==========
+            self.right_frame = tk.Frame(self.main_paned, bg="white")
+            self.main_paned.add(self.right_frame, minsize=400)
+            self.canvas = myCanvas(self.right_frame)
+
+            self.create_toolbox(self.left_frame)
+
+            self.window.protocol(
+                "WM_DELETE_WINDOW", self._on_close
+            )  # 将叉号绑定_on_close函数
+
+        def _on_close(self):
+            global exist2
+            exist2 = False
+            self.window.destroy()
+
+        def create_toolbox(self, parent):
+            toolbox_frame = tk.Frame(parent, bg="#f0f0f0")
+            toolbox_frame.grid(row=11, column=0, sticky="nsew", pady=10, padx=5)
+            lbl_toolbox = tk.Label(
+                toolbox_frame, text="工具栏", bg="#e0e0e0", relief="ridge", padx=5
+            )
+            lbl_toolbox.pack(fill=tk.BOTH, pady=(0, 10))
+            btn_frame = tk.Frame(toolbox_frame, bg="#f0f0f0")
+            btn_frame.pack(fill=tk.BOTH, expand=True)
+
+            # 定义工具集
+            tools = [
+                ("移动", self.canvas.default_cond),
+                ("描点", self.canvas.start_draw_points),
+                ("线段", self.canvas.start_draw_lines),
+                ("圆", self.canvas.start_draw_circles),
+                ("中点", self.canvas.start_draw_midpoints),
+                ("删除", self.canvas.start_delete),
+                ("清屏", self.canvas.delete_all),
+                ("保存", self.canvas.save_canvas),
+                ("回位", self.canvas.home),
+            ]
+            for idx, (text, command) in enumerate(tools):
+                btn = ttk.Button(btn_frame, text=text, command=command, width=17)
+                btn.grid(
+                    row=idx // 2, column=idx % 2, padx=5, pady=5, sticky="nsew", ipady=4
+                )
+
+    def create_canvas(self):
+        global canvasWindow
+        canvasWindow = self.canvas_window(self.window)
 
     def extreme_point(self):
         cur_act = self.current_act
@@ -300,7 +374,7 @@ class child_window:
             expr = re.sub(r"β", f"{beta_val}", expr)
             expr = re.sub(r"γ", f"{gamma_val}", expr)
             extr_points = find_extreme_points(expr, self.ax.get_xlim())
-            print(extr_points)
+            # print(extr_points)
             if len(extr_points) > 0:
                 xs = [float(p[0]) for p in extr_points]
                 ys = [float(p[1]) for p in extr_points]
@@ -328,9 +402,9 @@ class child_window:
             expr = re.sub(r"α", f"{alpha_val}", expr)
             expr = re.sub(r"β", f"{beta_val}", expr)
             expr = re.sub(r"γ", f"{gamma_val}", expr)
-            print(expr)
+            # print(expr)
             roots = find_roots(expr, self.ax.get_xlim())
-            print(roots)
+            # print(roots)
             if len(roots) > 0:
                 ys = np.zeros(len(roots))
                 self.figCanvas.zeropts[tmp] = self.ax.plot(
@@ -376,10 +450,10 @@ class child_window:
             expr = re.sub(r"β", f"{beta_val}", expr)
             expr = re.sub(r"γ", f"{gamma_val}", expr)
             # print(expr, "***")
-            print(expr, alpha_val, beta_val, gamma_val)
+            # print(expr, alpha_val, beta_val, gamma_val)
             derived_func = get_derived(expr=expr)
-            self.figCanvas.draw_plots2(derived_func)
-            self.figCanvas.is_derivedfunc_exist[tmp] = True
+            self.figCanvas.draw_plots2(derived_func, tmp)
+            # self.figCanvas.is_derivedfunc_exist[tmp] = True
             self.figCanvas.derivedfunc[tmp] = derived_func
         else:
             derived_func = self.figCanvas.derivedfunc.pop(tmp)
@@ -415,14 +489,21 @@ class child_window:
 
 def open_graph():
     global graph_window
-    graph_window=child_window(root)
+    graph_window = child_window(root)
+
+
 def draw():
-    input=input_entry.get()
-    entry=graph_window.entries[graph_window.current_act-1]
-    graph_window.clear_single(graph_window.current_act)
-    entry.insert(0,input)
-    graph_window.figCanvas.draw_plots(input)
-    all_clear()
+    try:
+        input = input_entry.get()
+        entry = graph_window.entries[graph_window.current_act - 1]
+        graph_window.clear_single(graph_window.current_act)
+        entry.insert(0, input)
+        graph_window.figCanvas.draw_plots(input)
+        all_clear()
+    except Exception as e:
+        # print(e)
+        messagebox.showerror(message="请先打开画板")
+
 
 # 定义按钮布局
 buttons = [
@@ -490,7 +571,7 @@ for params in buttons:
         btn.config(command=all_clear)
     elif text == "🖌":
         btn.config(command=open_graph)
-    elif text=="绘图":
+    elif text == "绘图":
         btn.config(command=draw)
     else:
         btn.config(command=lambda t=text: insert_char(t))
