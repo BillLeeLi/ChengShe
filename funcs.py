@@ -32,7 +32,7 @@ def insert_multiplication(expr: str):
     )  # 数字、xyeπ或)在左且(、字母和π在右的时候中间加上*
     expr = re.sub(r"ln", r"log", expr)  # ln转化为log
     expr = re.sub(r"\^", r"**", expr)
-    print(expr)
+    # print(expr)
     return expr
 
 
@@ -61,7 +61,7 @@ def process_expr(expr: str):
     ]
     for func in functions:
         expr = re.sub(rf"\b{func}\s*\(", f"np.{func}(", expr)
-    print(expr)
+    # print(expr)
     return expr
 
 
@@ -79,7 +79,7 @@ def calc(expr: str):
             res = eval(expr, {"np": np, "π": np.pi, "e": np.e, "__builtins__": {}})
             return f"{res:.9f}"
     except Exception as e:
-        print(e)  # 用于测试，后期会注释掉
+        # print(e)  # 用于测试，后期会注释掉
         messagebox.showerror(title="错误", message="请检查算术表达式")
         return None
 
@@ -216,7 +216,7 @@ class FigureCanvas:
                 print(e)
                 messagebox.showerror(title="错误", message="请检查隐函数表达式")
 
-    def draw_plots2(self, func):
+    def draw_plots2(self, func, expr):
         """
         与draw_plots的效果相同,但是接受的参数是函数而不是字符串
         """
@@ -228,6 +228,7 @@ class FigureCanvas:
                 ys = func(xs)
                 self.derived[func] = self.__ax.plot(xs, ys)[0]
                 self.__plot_canvas.draw()
+                self.is_derivedfunc_exist[expr] = True
         except Exception as e:
             print(e)
             # print("hello")
@@ -456,7 +457,7 @@ def find_roots(expr: str, x_range=(-10, 10), error=1e-7):
                     roots.append(round(root, 7))
             return sorted(roots)
     except Exception as e:
-        print(e)
+        # print(e)
         messagebox.showerror(title="错误", message="请检查函数表达式")
         return []
 
@@ -493,7 +494,7 @@ def find_extreme_points(expr: str, x_range=(-10, 10), error=1e-7):
                 i += 1
         return extr_points
     except Exception as e:
-        print(e)
+        # print(e)
         messagebox.showerror(title="错误", message="请检查函数表达式")
         return []
 
@@ -508,5 +509,5 @@ def get_derived(expr: str):
             return lambda x: np.full_like(x, float(derived_func))
         return sympy.lambdify(x, derived_func, "numpy")
     except Exception as e:
-        print(e)
+        # print(e)
         messagebox.showerror(title="错误", message="请检查函数表达式")
