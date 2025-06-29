@@ -480,9 +480,27 @@ class child_window:
         """清空指定输入框"""
         index = input_id - 1
         entry = self.entries[index]  # 第2个子组件是输入框
+        expr = entry.get()
+        expr = insert_multiplication(expr)
 
-        expr = entry.get()  # 表达式
-        self.figCanvas.delete_plots(expr=expr)  # 删除表达式对应的函数
+        if self.figCanvas.is_extrpts_exist[expr]:
+            # 极值点已经标出了
+            self.figCanvas.extrpts.pop(expr).remove()  # 移出字典并消除图像
+            self.figCanvas._FigureCanvas__plot_canvas.draw()
+            self.figCanvas.is_extrpts_exist[expr] = False
+        if self.figCanvas.is_zeropts_exist[expr]:
+            # 零点已经标出了
+            self.figCanvas.zeropts.pop(expr).remove()  # 移出字典并消除图像
+            self.figCanvas._FigureCanvas__plot_canvas.draw()
+            self.figCanvas.is_zeropts_exist[expr] = False
+        if self.figCanvas.is_derivedfunc_exist[expr]:
+            derived_func = self.figCanvas.derivedfunc.pop(expr)
+            self.figCanvas.derived.pop(derived_func).remove()
+            self.figCanvas._FigureCanvas__plot_canvas.draw()
+            self.figCanvas.is_derivedfunc_exist[expr] = False
+
+        tmp = entry.get()  # 表达式
+        self.figCanvas.delete_plots(expr=tmp)  # 删除表达式对应的函数
 
         entry.delete(0, tk.END)
 
